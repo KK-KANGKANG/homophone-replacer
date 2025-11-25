@@ -46,7 +46,7 @@ homophone-replacer-standalone/
 
 1、cppjieba需要下载到`third_party/cppjieba/`目录。[👉 点击下载](https://github.com/yanyiwu/cppjieba)
 
-2、cppjieba中的依赖库也需要拉取下来，[👉 点击下载](https://github.com/yanyiwu/cppjieba](https://github.com/yanyiwu/limonp/tree/5c82a3f17e4e0adc6a5decfe245054b0ed533d1a)
+2、cppjieba中的依赖库也需要拉取下来，[👉 点击下载](https://github.com/yanyiwu/limonp/tree/5c82a3f17e4e0adc6a5decfe245054b0ed533d1a)
 
 ### 3. 编译
 
