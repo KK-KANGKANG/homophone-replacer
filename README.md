@@ -6,7 +6,7 @@
 
 - 独立的C++项目，无需完整的sherpa-onnx环境
 - 支持Windows和Linux平台编译
-- 基于 jieba 分词 + kaldifst FST 规则（replace.fst）的同音词组替换
+- 基于 lexicon.txt (最大匹配分词) + kaldifst FST 规则（replace.fst）的同音词组替换
 - 最小化依赖，快速编译和部署
 
 ## 项目结构
@@ -16,14 +16,11 @@ homophone-replacer-standalone/
 ├── src/                    # 源代码
 │   ├── homophone-replacer.h/cc  # 核心同音字替换类
 │   ├── main.cc                 # 主程序入口
-│   ├── jieba/                  # jieba分词封装
 │   └── utils/                  # 工具函数
 ├── data/hr-files/              # 数据文件
-│   ├── dict/                   # jieba词典文件
 │   ├── lexicon.txt             # 拼音词典
 │   └── replace.fst             # 替换规则（FST）
 ├── third_party/                # 第三方依赖
-│   └── cppjieba/               # cppjieba库
 ├── CMakeLists.txt              # CMake配置
 ├── build.bat                   # Windows构建脚本
 ├── build.sh                    # Linux构建脚本
@@ -42,13 +39,7 @@ homophone-replacer-standalone/
 - GCC 7+ 或 Clang 8+
 - CMake 3.13+
 
-### 2. 检查依赖
-
-1、cppjieba需要下载到`third_party/cppjieba/`目录。[👉 点击下载](https://github.com/yanyiwu/cppjieba)
-
-2、cppjieba中的依赖库也需要拉取下来，[👉 点击下载](https://github.com/yanyiwu/limonp/tree/5c82a3f17e4e0adc6a5decfe245054b0ed533d1a)
-
-### 3. 编译
+### 2. 编译
 
 **Windows:**
 ```cmd
@@ -126,7 +117,7 @@ export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
 
 ## 技术原理
 
-1. **分词**: 使用 jieba 对输入文本进行中文分词
+1. **分词**: 基于 `lexicon.txt` 对输入文本进行最大前向匹配分词
 2. **拼音转换**: 词语转为拼音序列（来自 `lexicon.txt`，单字回退）
 3. **FST 规则重写**: 使用 `replace.fst` 在拼音序列上进行短语级匹配与替换
 4. **结果重构**: 根据 FST 输出的词序列重组为文本

@@ -40,31 +40,24 @@ endif()
 
 # Linux/GCC设置
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  add_compile_options(-Wall -Wextra)
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-sign-compare)
 endif()
 
 # 包含目录
 include_directories(${PROJECT_SOURCE_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/third_party/cppjieba/include)
-include_directories(${PROJECT_SOURCE_DIR}/third_party/cppjieba/deps)
-include_directories(${PROJECT_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
 
 # 引入 kaldifst (提供 TextNormalizer)
 include(${CMAKE_SOURCE_DIR}/cmake/kaldifst.cmake)
-include_directories(${kaldifst_SOURCE_DIR})
+include_directories(SYSTEM ${kaldifst_SOURCE_DIR})
 # openfst 头文件目录（与主库一致）：${openfst_SOURCE_DIR}/src/include
 if(DEFINED openfst_SOURCE_DIR)
-  include_directories(${openfst_SOURCE_DIR}/src/include)
+  include_directories(SYSTEM ${openfst_SOURCE_DIR}/src/include)
 endif()
 
 # 源文件
 set(UTILS_SOURCES
   src/utils/file-utils.cc
   src/utils/text-utils.cc
-)
-
-set(JIEBA_SOURCES
-  src/jieba/jieba-wrapper.cc
 )
 
 set(CORE_SOURCES
@@ -78,7 +71,6 @@ set(MAIN_SOURCES
 # 创建可执行文件
 add_executable(homophone-replacer-standalone
   ${UTILS_SOURCES}
-  ${JIEBA_SOURCES}
   ${CORE_SOURCES}
   ${MAIN_SOURCES}
 )
@@ -92,7 +84,7 @@ target_link_libraries(homophone-replacer-standalone
 
 # 继承 openfst 的头文件搜索路径，确保能找到 fst/fst.h
 target_include_directories(homophone-replacer-standalone
-  PRIVATE
+  SYSTEM PRIVATE
     $<TARGET_PROPERTY:fst,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
@@ -112,7 +104,6 @@ install(TARGETS homophone-replacer-standalone
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
-message(STATUS "CPPJIEBA_INCLUDE_DIR: ${PROJECT_SOURCE_DIR}/third_party/cppjieba/include")
 
 # 提示信息
 message(STATUS "")

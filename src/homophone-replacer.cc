@@ -5,15 +5,17 @@
 #include "homophone-replacer.h"
 #include "utils/file-utils.h"
 #include "utils/text-utils.h"
-#include "jieba/jieba-wrapper.h"
 
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <iostream>
 #include <vector>
 #include <iomanip>
 #include <set>
+#include <algorithm>
+#include <chrono>
 
 // 引入 FST 文本归一化器
 #include "kaldifst/csrc/text-normalizer.h"
@@ -21,21 +23,6 @@
 namespace hr_standalone {
 
 bool HomophoneReplacerConfig::Validate() const {
-  if (!dict_dir.empty()) {
-    std::vector<std::string> required_files = {
-        "jieba.dict.utf8", "hmm_model.utf8",  "user.dict.utf8",
-        "idf.utf8",        "stop_words.utf8",
-    };
-
-    for (const auto &f : required_files) {
-      if (!FileExists(dict_dir + "/" + f)) {
-        std::cerr << "Error: '" << dict_dir << "/" << f 
-                  << "' does not exist. Please check dict-dir" << std::endl;
-        return false;
-      }
-    }
-  }
-
   if (!lexicon.empty() && !FileExists(lexicon)) {
     std::cerr << "Error: lexicon file '" << lexicon << "' does not exist" << std::endl;
     return false;
@@ -64,7 +51,6 @@ bool HomophoneReplacerConfig::Validate() const {
 std::string HomophoneReplacerConfig::ToString() const {
   std::ostringstream os;
   os << "HomophoneReplacerConfig(";
-  os << "dict_dir=\"" << dict_dir << "\", ";
   os << "lexicon=\"" << lexicon << "\", ";
   os << "rule_fsts=\"" << rule_fsts << "\")";
   return os.str();
@@ -73,8 +59,6 @@ std::string HomophoneReplacerConfig::ToString() const {
 class HomophoneReplacer::Impl {
  public:
   explicit Impl(const HomophoneReplacerConfig &config) : config_(config) {
-    jieba_ = InitJieba(config.dict_dir);
-
     if (!config.lexicon.empty()) {
       std::ifstream is(config.lexicon);
       InitLexicon(is);
@@ -98,23 +82,25 @@ class HomophoneReplacer::Impl {
   }
 
   std::string Apply(const std::string &text) const {
-    if (text.empty() || !jieba_) {
+    if (text.empty()) {
       return text;
     }
 
     auto now = [](){ return std::chrono::steady_clock::now(); };
     auto t0 = now();
 
-    bool is_hmm = true;
-    std::vector<std::string> words;
-    jieba_->Cut(text, words, is_hmm);
+    // 1. 先按 UTF-8 字符切分
+    std::vector<std::string> utf8_chars = SplitUtf8(text);
+    
+    // 2. 基于词典进行最大前向匹配分词 (替代 jieba)
+    std::vector<std::string> words = Segment(utf8_chars);
 
     auto t1 = now();
 
     if (config_.debug) {
       std::cout << "Input text: '" << text << "'" << std::endl;
       std::ostringstream os;
-      os << "After jieba: ";
+      os << "After segmentation: ";
       std::string sep;
       for (const auto &w : words) {
         os << sep << w;
@@ -145,7 +131,33 @@ class HomophoneReplacer::Impl {
         continue;
       }
 
-      auto p = ConvertWordToPronunciation(w);
+      std::string p = ConvertWordToPronunciation(w);
+      std::vector<std::string> sub_chars = SplitUtf8(w);
+
+      if (sub_chars.size() > 1) {
+        // 尝试按数字（声调）拆分词组拼音
+        std::vector<std::string> sub_prons;
+        size_t start_pos = 0;
+        for (size_t i = 0; i < p.size(); ++i) {
+          if (p[i] >= '0' && p[i] <= '9') {
+            sub_prons.push_back(p.substr(start_pos, i - start_pos + 1));
+            start_pos = i + 1;
+          }
+        }
+
+        // 如果拆分出的拼音数量与字数一致，则按字提交给 FST
+        if (sub_prons.size() == sub_chars.size()) {
+          for (size_t i = 0; i < sub_chars.size(); ++i) {
+            current_words.push_back(sub_chars[i]);
+            current_pronunciations.push_back(sub_prons[i]);
+          }
+          if (config_.debug) {
+            std::cout << w << " (Split) -> " << p << std::endl;
+          }
+          continue;
+        }
+      }
+
       if (config_.debug) {
         std::cout << w << " -> " << p << std::endl;
       }
@@ -181,6 +193,49 @@ class HomophoneReplacer::Impl {
   }
 
  private:
+  // 最大前向匹配分词
+  std::vector<std::string> Segment(const std::vector<std::string>& chars) const {
+    std::vector<std::string> words;
+    int32_t n = static_cast<int32_t>(chars.size());
+    int32_t max_len = 10; // 最大匹配长度
+    
+    for (int32_t i = 0; i < n; ) {
+      bool matched = false;
+      // 如果是字母或数字，合并连续的
+      if (chars[i].size() == 1 && std::isalnum(static_cast<unsigned char>(chars[i][0]))) {
+        std::string word = chars[i];
+        int32_t j = i + 1;
+        while (j < n && chars[j].size() == 1 && std::isalnum(static_cast<unsigned char>(chars[j][0]))) {
+          word += chars[j];
+          ++j;
+        }
+        words.push_back(word);
+        i = j;
+        continue;
+      }
+
+      // 尝试匹配词典中的词
+      for (int32_t len = std::min(max_len, n - i); len > 1; --len) {
+        std::string word;
+        for (int32_t j = 0; j < len; ++j) {
+          word += chars[i + j];
+        }
+        if (all_words_.count(word)) {
+          words.push_back(word);
+          i += len;
+          matched = true;
+          break;
+        }
+      }
+      
+      if (!matched) {
+        words.push_back(chars[i]);
+        i += 1;
+      }
+    }
+    return words;
+  }
+
   // 应用 FST 规则到当前中文片段
   std::string ApplyImpl(const std::vector<std::string> &words,
                         const std::vector<std::string> &pronunciations) const {
@@ -257,7 +312,8 @@ class HomophoneReplacer::Impl {
         continue;
       }
 
-      word2pron_.insert({std::move(word), std::move(pron)});
+      word2pron_.insert({word, std::move(pron)});
+      all_words_.insert(std::move(word));
     }
   }
 
@@ -293,16 +349,12 @@ class HomophoneReplacer::Impl {
   std::string ApplyRuntimeOverrides(const std::string &text) const {
     if (runtime_rule_map_.empty()) return text;
 
-    // 将文本转为拼音序列，再做子串替换，最后直接替换文本中的原片段。
-    // 简化实现：直接做逐键查找替换（假设 keys 只会匹配由 ConvertWordToPronunciation 生成的拼音片段）。
-    // 为稳妥，按 key 长度从长到短，避免较短键破坏较长匹配。
+    // 逐条规则替换：找到命中的子串，推回到词范围替换原文
     std::vector<std::pair<std::string, std::string>> rules(runtime_rule_map_.begin(), runtime_rule_map_.end());
     std::sort(rules.begin(), rules.end(), [](auto &a, auto &b){return a.first.size() > b.first.size();});
 
-    // 将整句再次按分词+拼音转为串，记录每个词的原文与拼音，用于定位替换
-    bool is_hmm = true;
-    std::vector<std::string> words;
-    jieba_->Cut(text, words, is_hmm);
+    // 再次分词
+    std::vector<std::string> words = Segment(SplitUtf8(text));
 
     std::vector<std::string> prons;
     prons.reserve(words.size());
@@ -322,7 +374,7 @@ class HomophoneReplacer::Impl {
       pron_seq += prons[i];
     }
 
-    // 逐条规则替换：找到命中的子串，推回到词范围替换原文
+    // 逐条规则替换
     std::string out = text;
     for (const auto &kv : rules) {
       const std::string &key = kv.first;      // 拼音
@@ -330,16 +382,15 @@ class HomophoneReplacer::Impl {
       size_t pos = 0;
       while ((pos = pron_seq.find(key, pos)) != std::string::npos) {
         // 找到覆盖的词区间
-        size_t begin_word = 0, end_word = prons.size();
-        // 二分定位 begin_word
-        begin_word = std::upper_bound(word_start.begin(), word_start.end(), pos) - word_start.begin();
+        size_t begin_word = std::upper_bound(word_start.begin(), word_start.end(), pos) - word_start.begin();
         if (begin_word > 0) --begin_word;
-        // 扩展到覆盖到 pos+key.size()
+        
         size_t end_pos = pos + key.size();
         while (begin_word < prons.size() && word_start[begin_word] + prons[begin_word].size() <= pos) ++begin_word;
         size_t j = begin_word;
         while (j < prons.size() && word_start[j] < end_pos) ++j;
-        end_word = j;
+        size_t end_word = j;
+        
         if (begin_word >= end_word) { pos += 1; continue; }
 
         // 替换原文对应片段
@@ -349,18 +400,21 @@ class HomophoneReplacer::Impl {
         for (size_t k = end_word; k < words.size(); ++k) after += words[k];
         out = before + val + after;
 
-        // 更新 pron_seq 与 words/prons 以支持多次命中
+        // 更新 words/prons 以支持多次命中
         words.erase(words.begin() + begin_word, words.begin() + end_word);
         prons.erase(prons.begin() + begin_word, prons.begin() + end_word);
         words.insert(words.begin() + begin_word, val);
-        prons.insert(prons.begin() + begin_word, val); // 目标词按原样插入
+        prons.insert(prons.begin() + begin_word, val);
 
         // 重建 pron_seq 和 word_start
         pron_seq.clear();
         word_start.resize(prons.size());
-        for (size_t t = 0; t < prons.size(); ++t) { word_start[t] = pron_seq.size(); pron_seq += prons[t]; }
+        for (size_t t = 0; t < prons.size(); ++t) { 
+          word_start[t] = pron_seq.size(); 
+          pron_seq += prons[t]; 
+        }
 
-        pos = 0; // 重新从头匹配该键，确保完全替换
+        pos = 0; // 重新从头匹配该键
       }
     }
 
@@ -369,9 +423,9 @@ class HomophoneReplacer::Impl {
 
  private:
   HomophoneReplacerConfig config_;
-  std::unique_ptr<JiebaWrapper> jieba_;
   std::vector<std::unique_ptr<kaldifst::TextNormalizer>> replacer_list_;
   std::unordered_map<std::string, std::string> word2pron_;
+  std::unordered_set<std::string> all_words_;
   std::unordered_map<std::string, std::string> runtime_rule_map_;
 };
 
@@ -385,3 +439,4 @@ std::string HomophoneReplacer::Apply(const std::string &text) const {
 }
 
 }  // namespace hr_standalone
+

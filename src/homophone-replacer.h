@@ -12,7 +12,6 @@
 namespace hr_standalone {
 
 struct HomophoneReplacerConfig {
-  std::string dict_dir;
   std::string lexicon;
   std::string rule_fsts;
   bool debug;
@@ -26,11 +25,17 @@ struct HomophoneReplacerConfig {
 
   HomophoneReplacerConfig() = default;
 
-  HomophoneReplacerConfig(const std::string &dict_dir,
+  HomophoneReplacerConfig(const std::string &lexicon,
+                          const std::string &rule_fsts, bool debug)
+      : lexicon(lexicon),
+        rule_fsts(rule_fsts),
+        debug(debug) {}
+
+  // 兼容旧版构造函数
+  HomophoneReplacerConfig(const std::string & /*dict_dir*/,
                           const std::string &lexicon,
                           const std::string &rule_fsts, bool debug)
-      : dict_dir(dict_dir),
-        lexicon(lexicon),
+      : lexicon(lexicon),
         rule_fsts(rule_fsts),
         debug(debug) {}
 

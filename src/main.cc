@@ -45,7 +45,6 @@ class ArgumentParser {
 public:
   ArgumentParser(int argc, char* argv[]) {
     // 设置默认固定路径
-    dict_dir = "./data/hr-files/dict";
     lexicon = "./data/hr-files/lexicon.txt";
     rule_fsts = "./data/hr-files/replace.fst";
     
@@ -66,8 +65,6 @@ public:
         text = argv[++i];
       } else if (arg == "--save-rules" && i + 1 < argc) {
         save_rules = argv[++i];
-      } else if (arg == "--text" && i + 1 < argc) {
-        text = argv[++i];
       } else {
         std::cerr << "Unknown argument: " << arg << std::endl;
         exit(1);
@@ -78,7 +75,6 @@ public:
 #ifdef _WIN32
   // Windows: 使用宽字符参数，转换为 UTF-8，避免中文参数乱码
   explicit ArgumentParser(const std::vector<std::string> &args) {
-    dict_dir = "./data/hr-files/dict";
     lexicon = "./data/hr-files/lexicon.txt";
     rule_fsts = "./data/hr-files/replace.fst";
 
@@ -98,8 +94,6 @@ public:
         text = args[++i];
       } else if (arg == "--save-rules" && i + 1 < args.size()) {
         save_rules = args[++i];
-      } else if (arg == "--text" && i + 1 < args.size()) {
-        text = args[++i];
       } else {
         std::cerr << "Unknown argument: " << arg << std::endl;
         exit(1);
@@ -120,7 +114,6 @@ public:
   }
 
   std::string text;
-  std::string dict_dir;
   std::string lexicon;
   std::string rule_fsts;
   std::vector<std::string> add_rules;
@@ -192,7 +185,6 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Default configuration:\n";
     std::cout << "  Text: " << args.text << "\n";
-    std::cout << "  Dict dir: " << args.dict_dir << "\n";
     std::cout << "  Lexicon: " << args.lexicon << "\n";
     std::cout << "  Rules: " << args.rule_fsts << "\n\n";
   }
@@ -211,7 +203,6 @@ int main(int argc, char* argv[]) {
   
   // 创建HomophoneReplacer配置
   HomophoneReplacerConfig hr_config(
-    args.dict_dir,
     args.lexicon, 
     args.rule_fsts,
     args.debug
@@ -273,10 +264,8 @@ int main(int argc, char* argv[]) {
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << "\n";
     std::cerr << "\nPlease check if the following files exist:\n";
-    std::cerr << "1. Dict directory: " << args.dict_dir << "\n";
-    std::cerr << "   - Should contain: jieba.dict.utf8, hmm_model.utf8, user.dict.utf8, idf.utf8, stop_words.utf8\n";
-    std::cerr << "2. Lexicon file: " << args.lexicon << "\n";
-    std::cerr << "3. FST rules file: " << args.rule_fsts << "\n";
+    std::cerr << "1. Lexicon file: " << args.lexicon << "\n";
+    std::cerr << "2. FST rules file: " << args.rule_fsts << "\n";
     return -1;
   }
 

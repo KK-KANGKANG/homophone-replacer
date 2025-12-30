@@ -18,16 +18,6 @@ rem 创建构建目录
 if not exist build mkdir build
 cd build
 
-rem 检查cppjieba是否存在
-if not exist ..\third_party\cppjieba\include\cppjieba\Jieba.hpp (
-    echo Error: cppjieba not found in third_party directory
-    echo 错误：在third_party目录中找不到cppjieba
-    echo Please download cppjieba and extract to third_party/cppjieba/
-    echo 请下载cppjieba并解压到third_party/cppjieba/目录
-    pause
-    exit /b 1
-)
-
 rem 运行CMake配置
 echo Running CMake configuration...
 cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release
