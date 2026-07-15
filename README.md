@@ -19,8 +19,13 @@ homophone-replacer-standalone/
 │   └── utils/                  # 工具函数
 ├── data/hr-files/              # 数据文件
 │   ├── lexicon.txt             # 拼音词典
-│   └── replace.fst             # 替换规则（FST）
-├── third_party/                # 第三方依赖
+│   ├── mapping.txt             # 长期规则源文件
+│   ├── replace.fst             # 正式替换规则（FST）
+│   └── fst-build-report.txt    # 正式 FST 构建报告
+├── make_replace/               # mapping 与 FST 生成工具
+├── scripts/
+│   └── build_fst_docker.sh     # 本地 Docker FST 构建脚本
+├── Dockerfile.pynini           # Pynini 构建环境
 ├── CMakeLists.txt              # CMake配置
 ├── build.bat                   # Windows构建脚本
 ├── build.sh                    # Linux构建脚本
@@ -45,10 +50,9 @@ homophone-replacer-standalone/
 ```cmd
 # 在VS开发者命令提示符中
 build.bat
-
-# 准备词库文件
-将data复制到生成的可执行文件homophone-replacer-standalone.exe目录下
 ```
+
+构建完成后，从项目根目录运行程序，使程序能读取 `./data/hr-files/`。
 
 **Linux:**
 ```bash
@@ -56,63 +60,51 @@ chmod +x build.sh
 # 默认 Release
 ./build.sh
 
-# # Debug
+# Debug
 # CONFIG=Debug ./build.sh
 
-# # 使用 Ninja
+# 使用 Ninja
 # GENERATOR="Ninja" ./build.sh
 
-# # 指定构建目录
-# BUILD_DIR=out ./build.sh
-
-# 准备词库文件
-将data复制到生成的可执行文件homophone-replacer-standalone目录下
-
-# Debug
-CONFIG=Debug ./build.sh
-
-# 使用 Ninja
-GENERATOR="Ninja" ./build.sh
-
 # 指定构建目录
-BUILD_DIR=out ./build.sh
+# BUILD_DIR=out ./build.sh
 
 # 运行（如遇共享库找不到，先设置环境变量）
 export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
-./build/bin/homophone-replacer-standalone --text "他想知道玄界芯片问题的答案" --debug
+./build/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
 ```
 
-### 4. 使用
+### 3. 使用
 
 ```bash
 # 基本使用
-./homophone-replacer-standalone --text "他想知道玄界芯片问题的答案"
+./build/bin/homophone-replacer-standalone --text "左侧乱潮"
 
 # 启用调试信息
-./homophone-replacer-standalone --text "他想知道答案" --debug
+./build/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
 
 # 查看帮助
-./homophone-replacer-standalone --help
+./build/bin/homophone-replacer-standalone --help
 
 # 运行时增删关键词（不会修改 replace.fst，只在本次进程内生效）
 # 添加（可重复多次）： --add-rule 拼音=汉字
-./homophone-replacer-standalone --text "他是排长" \
+./build/bin/homophone-replacer-standalone --text "他是排长" \
   --add-rule "pai2zhang3=排长" --debug
 
 # 删除（可重复多次）： --del-rule 拼音
-./homophone-replacer-standalone --text "器具损坏影响排长" \
+./build/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
   --rules-file ./data/hr-files/mapping.txt --del-rule qi4ju4 --debug
 
 # 批量： --rules-file 文件（每行：拼音=汉字）
-./homophone-replacer-standalone --text "器具损坏影响排长" \
+./build/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
   --rules-file ./data/hr-files/mapping.txt --debug
 ```
 
 ## 输入输出示例
 
 ```
-输入: "他想知道玄界芯片问题的答案"
-输出: "他想知道玄戒芯片问题的答案"
+输入: "左侧乱潮"
+输出: "左侧卵巢"
 ```
 
 ## 技术原理
@@ -130,34 +122,79 @@ export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
 
 ```text
 超声词汇.xlsx + data/hr-files/lexicon.txt
-→ 候选 mapping.txt
+→ .fst-build/mapping.generated.txt
 → 人工审核
+→ data/hr-files/mapping.txt
 → replace.fst
 ```
 
-可直接使用仓库内的 [Colab 生成脚本](https://colab.research.google.com/github/KK-KANGKANG/homophone-replacer/blob/main/make_replace/generate_replace_fst_colab.ipynb)。本地有 Pynini 环境时，也可以执行：
+`data/hr-files/mapping.txt` 是长期 FST 的规则源文件，格式为每行一条 `带声调拼音=目标文字`：
+
+```text
+luan3chao2=卵巢
+chang2jing4=长径
+```
+
+需要从新的 Excel 生成候选 mapping 时，在项目根目录执行：
 
 ```bash
+mkdir -p .fst-build
+
 python3 -m make_replace.main prepare \
   --excel 超声词汇.xlsx \
   --lexicon data/hr-files/lexicon.txt \
-  --mapping-output /tmp/ultrasound-mapping.generated.txt \
-  --report-output /tmp/ultrasound-mapping-report.txt
+  --mapping-output .fst-build/mapping.generated.txt \
+  --report-output .fst-build/mapping-report.txt
+```
 
-python3 -m make_replace.main build \
-  --mapping /tmp/ultrasound-mapping.reviewed.txt \
-  --fst-output /tmp/replace.fst \
-  --report-output /tmp/fst-build-report.txt
+审核 `.fst-build/mapping.generated.txt` 和报告，修正专业读音后，将审核结果保存为 `.fst-build/mapping.reviewed.txt`。确认无误后覆盖正式规则源：
+
+```bash
+cp .fst-build/mapping.reviewed.txt data/hr-files/mapping.txt
+```
+
+项目使用本地 Docker 中的 Linux x86_64 Pynini 环境构建 FST。Docker 至少分配 16GB 内存，推荐 24GB；构建必须串行执行：
+
+```bash
+./scripts/build_fst_docker.sh
+```
+
+FST 候选文件生成在：
+
+```text
+.fst-build/replace-tone-aware.fst
+.fst-build/tone-aware-report.txt
+```
+
+确认 mapping 和构建结果后，可重新构建并安装到正式数据目录：
+
+```bash
+./scripts/build_fst_docker.sh --install
+```
+
+仅生成带声调精确匹配基准文件：
+
+```bash
+./scripts/build_fst_docker.sh --exact-only
 ```
 
 注意：
 
 - 新候选 mapping 只来自 Excel 和 `lexicon.txt`，不会混入项目现有的历史 `mapping.txt`。
-- 必须先审核 `prepare` 的结果，再执行 `build`。
+- `.fst-build/` 位于项目目录内，保存生成过程中的候选文件，并已加入 `.gitignore`。
+- 必须先审核候选 mapping，再覆盖 `data/hr-files/mapping.txt` 和构建 FST。
 - 专业多音字通常应修正到 `lexicon.txt`；若明确不调整通用词典，则在人工审核 mapping 时修正读音。
 - 相同带调拼音对应多个目标时，保留 mapping 中先出现的目标，后续目标会被丢弃并写入构建报告。
 - 去掉声调后对应多个目标时，保留各自的精确规则，但不生成无调规则。
+- 正常运行只读取 `lexicon.txt` 和 `replace.fst`，不会直接读取 `mapping.txt`。
 - 生产环境只加载审核后生成的 `replace.fst`，不要再通过 `--rules-file` 重复加载整份 mapping。
+- 当前正式 FST 的构建信息见 `data/hr-files/fst-build-report.txt`。
+
+### FST 性能
+
+当前目标 FST 包含 1,957 条精确规则、1,943 条无调规则和 7 组冲突保护。实测首次加载约 174ms；3,400 字长文本处理 5 次平均约 94.7ms。普通 20～50 字 ASR 单句通常为毫秒级，单个词汇通常低于 1ms。
+
+`HomophoneReplacer` 应在程序启动时创建并长期复用。不要为每次识别请求重新初始化，否则会重复支付 FST 加载时间。
 
 ### 运行时增删关键词（拼音→汉字）
 

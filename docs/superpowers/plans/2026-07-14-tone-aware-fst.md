@@ -6,7 +6,7 @@
 
 **Architecture:** Python 准备阶段复刻 C++ 的 lexicon 加载、最大前向分词和单字回退行为，先生成可审核的新 `mapping.txt`。FST 编译阶段为每条规则生成高优先级精确路径，并只为纯拼音唯一目标生成低优先级任意声调路径，最终合并为一个 `replace.fst`；C++ 临时规则使用相同的精确优先和唯一目标宽松策略。
 
-**Tech Stack:** C++17、Python 3 标准库、Pynini/OpenFST、kaldifst、CMake、`unittest`、Google Colab。
+**Tech Stack:** C++17、Python 3 标准库、Pynini/OpenFST、kaldifst、CMake、Docker、`unittest`。
 
 ## Decision Amendment (2026-07-15)
 
@@ -16,6 +16,9 @@
 - 用户确认：`长径` 在最终 mapping 中使用 `chang2jing4`，但不修改 `lexicon.txt`；本次作为人工审核修正处理。
 - 本修订覆盖下文所有“带调拼音冲突时停止并等待人工选择”的旧步骤；无调拼音对应多个目标时仍然禁用宽松规则。
 - 无调冲突词需要在运行时和 FST 中阻断更短的无调规则，避免短词从冲突长词内部抢先替换。
+- 最终放弃 Colab，使用本地 Docker Linux x86_64 构建。Docker 至少分配 16GB 内存，推荐 24GB。
+- 删除 `make_replace/generate_replace_fst_colab.ipynb`，新增 `Dockerfile.pynini` 和 `scripts/build_fst_docker.sh`。
+- 生产 FST 已在 24.9GB Docker 环境构建并通过本机 C++ 验证：59,252,050 字节，构建耗时 217.034 秒。
 
 ## Global Constraints
 
@@ -44,7 +47,8 @@
 - `make_replace/tests/test_lexicon_mapping.py`：Excel、lexicon、分词和 mapping 生成测试。
 - `make_replace/tests/test_rule_planner.py`：规则去重、冲突和宽松规则计划测试。
 - `make_replace/tests/test_build_replace_fst.py`：Pynini 可用时的编译与改写集成测试。
-- `make_replace/generate_replace_fst_colab.ipynb`：调用项目内同一 Python 逻辑的 Colab 包装。
+- `Dockerfile.pynini`：固定 Linux x86_64 Pynini 构建环境。
+- `scripts/build_fst_docker.sh`：本地测试、候选构建和可选安装入口。
 - `src/runtime-rule-matcher.h`：临时规则匹配接口。
 - `src/runtime-rule-matcher.cc`：临时规则精确优先、唯一目标宽松匹配实现。
 - `tests/runtime-rule-matcher-test.cc`：不依赖第三方测试框架的 C++ 单元测试。
@@ -54,7 +58,7 @@
 - `make_replace/main.py`：从硬编码示例改为 `prepare` / `build` 命令入口。
 - `src/homophone-replacer.cc`：接入独立的临时规则匹配器。
 - `CMakeLists.txt`：编译新 C++ 源文件并注册测试；执行前需要用户确认。
-- `README.md`：更新 Excel → mapping → FST、本地生成和 Colab 使用方式。
+- `README.md`：更新 Excel → mapping → FST 和本地 Docker 生成方式。
 - `data/hr-files/lexicon.txt`：只在人工确认专业多音字后增加或修正具体词条。
 - `data/hr-files/mapping.txt`：只在人工审核生成结果后替换为新的超声规则。
 - `data/hr-files/replace.fst`：只在全部测试和性能验证通过后替换。
@@ -1296,7 +1300,9 @@ Proposed commit: `feat(runtime): 统一精确与宽松临时规则行为`。Do n
 
 ---
 
-### Task 8: Provide the Colab Wrapper and Documentation
+### Task 8: Historical Colab Wrapper (Superseded by Local Docker)
+
+> 本节是原实施记录，最终交付已改为本地 Docker，Notebook 已删除。当前操作方式以 README 和上方 Decision Amendment 为准。
 
 **Files:**
 - Create: `make_replace/generate_replace_fst_colab.ipynb`

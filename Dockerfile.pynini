@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+ARG PYNINI_VERSION=2.1.7
+
+RUN python3 -m pip install \
+    --no-cache-dir \
+    --only-binary=:all: \
+    "pynini==${PYNINI_VERSION}"
+
+WORKDIR /work
