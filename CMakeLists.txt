@@ -62,6 +62,7 @@ set(UTILS_SOURCES
 
 set(CORE_SOURCES
   src/homophone-replacer.cc
+  src/runtime-rule-matcher.cc
 )
 
 set(MAIN_SOURCES
@@ -94,6 +95,17 @@ endif()
 
 # 设置编译器特性
 target_compile_features(homophone-replacer-standalone PRIVATE cxx_std_17)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(runtime-rule-matcher-test
+    tests/runtime-rule-matcher-test.cc
+    src/runtime-rule-matcher.cc
+  )
+  target_include_directories(runtime-rule-matcher-test PRIVATE ${PROJECT_SOURCE_DIR}/src)
+  target_compile_features(runtime-rule-matcher-test PRIVATE cxx_std_17)
+  add_test(NAME runtime-rule-matcher COMMAND runtime-rule-matcher-test)
+endif()
 
 # 安装规则
 install(TARGETS homophone-replacer-standalone

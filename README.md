@@ -124,9 +124,40 @@ export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
 
 ## 自定义扩展
 
-要自定义短语替换：
-- 使用官方 Colab 脚本生成新的 `replace.fst`。[👉 点击运行](https://colab.research.google.com/drive/1jEaS3s8FbRJIcVQJv2EQx19EM_mnuARi?usp=sharing)
-- 将生成的 `replace.fst` 覆盖到 `data/hr-files/replace.fst`
+### 生成长期超声规则
+
+新规则的数据流如下：
+
+```text
+超声词汇.xlsx + data/hr-files/lexicon.txt
+→ 候选 mapping.txt
+→ 人工审核
+→ replace.fst
+```
+
+可直接使用仓库内的 [Colab 生成脚本](https://colab.research.google.com/github/KK-KANGKANG/homophone-replacer/blob/main/make_replace/generate_replace_fst_colab.ipynb)。本地有 Pynini 环境时，也可以执行：
+
+```bash
+python3 -m make_replace.main prepare \
+  --excel 超声词汇.xlsx \
+  --lexicon data/hr-files/lexicon.txt \
+  --mapping-output /tmp/ultrasound-mapping.generated.txt \
+  --report-output /tmp/ultrasound-mapping-report.txt
+
+python3 -m make_replace.main build \
+  --mapping /tmp/ultrasound-mapping.reviewed.txt \
+  --fst-output /tmp/replace.fst \
+  --report-output /tmp/fst-build-report.txt
+```
+
+注意：
+
+- 新候选 mapping 只来自 Excel 和 `lexicon.txt`，不会混入项目现有的历史 `mapping.txt`。
+- 必须先审核 `prepare` 的结果，再执行 `build`。
+- 专业多音字通常应修正到 `lexicon.txt`；若明确不调整通用词典，则在人工审核 mapping 时修正读音。
+- 相同带调拼音对应多个目标时，保留 mapping 中先出现的目标，后续目标会被丢弃并写入构建报告。
+- 去掉声调后对应多个目标时，保留各自的精确规则，但不生成无调规则。
+- 生产环境只加载审核后生成的 `replace.fst`，不要再通过 `--rules-file` 重复加载整份 mapping。
 
 ### 运行时增删关键词（拼音→汉字）
 
@@ -137,6 +168,8 @@ export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
 说明：
 - 这些规则只在当前进程内生效，不会写回或修改 `replace.fst`。
 - 运行时规则优先级高于 `replace.fst`，可用于热修或兜底；长期规则建议编入新的 `replace.fst` 以获得更好性能与一致性。
-- 在生成replace.fst时会非常的慢，如果你很介意这一点，建议直接去掉replace.fst，直接通过每次识别的时候加载已准备好的关键词表 mapping.txt
+- 运行时先匹配带声调拼音；精确失败后，只有无调拼音唯一对应一个目标时才会忽略声调匹配。
+- 若同一无调拼音对应多个目标，程序不会猜测，只保留带声调精确匹配。
+- 遇到无调冲突长词时，也不会让更短的无调规则从长词内部抢先替换。
 
 注意：当前仅支持单个 `replace.fst` 文件

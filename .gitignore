@@ -1,0 +1,20 @@
+# CMake build directories
+/build/
+/out/
+/cmake-build-*/
+
+# Accidental in-source CMake output
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/CTestTestfile.cmake
+/Testing/
+/Makefile
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+/.venv/
+
+# macOS metadata
+.DS_Store

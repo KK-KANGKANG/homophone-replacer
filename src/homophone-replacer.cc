@@ -3,6 +3,7 @@
 // Copyright (c)  2025  Xiaomi Corporation
 
 #include "homophone-replacer.h"
+#include "runtime-rule-matcher.h"
 #include "utils/file-utils.h"
 #include "utils/text-utils.h"
 
@@ -343,81 +344,37 @@ class HomophoneReplacer::Impl {
         }
       }
     }
+
+    runtime_rule_matcher_.Reset(runtime_rule_map_);
   }
 
-  // 在最终文本上按最长优先应用 runtime 规则：将拼音键替换为目标汉字
+  // 在最终文本上按精确优先、无调唯一目标兜底应用 runtime 规则
   std::string ApplyRuntimeOverrides(const std::string &text) const {
     if (runtime_rule_map_.empty()) return text;
 
-    // 逐条规则替换：找到命中的子串，推回到词范围替换原文
-    std::vector<std::pair<std::string, std::string>> rules(runtime_rule_map_.begin(), runtime_rule_map_.end());
-    std::sort(rules.begin(), rules.end(), [](auto &a, auto &b){return a.first.size() > b.first.size();});
-
-    // 再次分词
     std::vector<std::string> words = Segment(SplitUtf8(text));
-
     std::vector<std::string> prons;
     prons.reserve(words.size());
-    for (const auto &w : words) {
-      if (w.size() < 3 || reinterpret_cast<const uint8_t *>(w.data())[0] < 128) {
-        prons.push_back(w);
+    for (const auto &word : words) {
+      if (word.size() < 3 ||
+          reinterpret_cast<const uint8_t *>(word.data())[0] < 128) {
+        prons.push_back(word);
       } else {
-        prons.push_back(ConvertWordToPronunciation(w));
+        prons.push_back(ConvertWordToPronunciation(word));
       }
     }
 
-    // 拼接为单一串以做匹配，并映射到词级范围
-    std::string pron_seq;
-    std::vector<size_t> word_start(prons.size());
-    for (size_t i = 0; i < prons.size(); ++i) {
-      word_start[i] = pron_seq.size();
-      pron_seq += prons[i];
-    }
-
-    // 逐条规则替换
-    std::string out = text;
-    for (const auto &kv : rules) {
-      const std::string &key = kv.first;      // 拼音
-      const std::string &val = kv.second;     // 目标汉字
-      size_t pos = 0;
-      while ((pos = pron_seq.find(key, pos)) != std::string::npos) {
-        // 找到覆盖的词区间
-        size_t begin_word = std::upper_bound(word_start.begin(), word_start.end(), pos) - word_start.begin();
-        if (begin_word > 0) --begin_word;
-        
-        size_t end_pos = pos + key.size();
-        while (begin_word < prons.size() && word_start[begin_word] + prons[begin_word].size() <= pos) ++begin_word;
-        size_t j = begin_word;
-        while (j < prons.size() && word_start[j] < end_pos) ++j;
-        size_t end_word = j;
-        
-        if (begin_word >= end_word) { pos += 1; continue; }
-
-        // 替换原文对应片段
-        std::string before;
-        for (size_t k = 0; k < begin_word; ++k) before += words[k];
-        std::string after;
-        for (size_t k = end_word; k < words.size(); ++k) after += words[k];
-        out = before + val + after;
-
-        // 更新 words/prons 以支持多次命中
-        words.erase(words.begin() + begin_word, words.begin() + end_word);
-        prons.erase(prons.begin() + begin_word, prons.begin() + end_word);
-        words.insert(words.begin() + begin_word, val);
-        prons.insert(prons.begin() + begin_word, val);
-
-        // 重建 pron_seq 和 word_start
-        pron_seq.clear();
-        word_start.resize(prons.size());
-        for (size_t t = 0; t < prons.size(); ++t) { 
-          word_start[t] = pron_seq.size(); 
-          pron_seq += prons[t]; 
-        }
-
-        pos = 0; // 重新从头匹配该键
+    std::string out;
+    for (size_t index = 0; index < words.size();) {
+      auto match = runtime_rule_matcher_.FindBest(prons, index);
+      if (match) {
+        out += match->replacement;
+        index = match->end_index;
+      } else {
+        out += words[index];
+        ++index;
       }
     }
-
     return out;
   }
 
@@ -427,6 +384,7 @@ class HomophoneReplacer::Impl {
   std::unordered_map<std::string, std::string> word2pron_;
   std::unordered_set<std::string> all_words_;
   std::unordered_map<std::string, std::string> runtime_rule_map_;
+  RuntimeRuleMatcher runtime_rule_matcher_;
 };
 
 HomophoneReplacer::HomophoneReplacer(const HomophoneReplacerConfig &config)
@@ -439,4 +397,3 @@ std::string HomophoneReplacer::Apply(const std::string &text) const {
 }
 
 }  // namespace hr_standalone
-
