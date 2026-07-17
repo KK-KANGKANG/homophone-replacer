@@ -241,9 +241,15 @@ class HomophoneReplacer::Impl {
   std::string ApplyImpl(const std::vector<std::string> &words,
                         const std::vector<std::string> &pronunciations) const {
     if (!replacer_list_.empty()) {
+      std::vector<std::string> bounded_pronunciations;
+      bounded_pronunciations.reserve(pronunciations.size());
+      for (const auto &pronunciation : pronunciations) {
+        // 规则必须匹配完整音节，避免 hou 从 zhou 内部命中。
+        bounded_pronunciations.push_back("#" + pronunciation + "#");
+      }
       for (const auto &r : replacer_list_) {
         // 目前仅支持一个规则文件
-        return r->Normalize(words, pronunciations);
+        return r->Normalize(words, bounded_pronunciations);
       }
     }
     // 没有 FST 规则时，直接拼接原词

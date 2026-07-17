@@ -1,0 +1,18 @@
+[Unit]
+Description=Homophone Replacer HTTP Service
+After=network.target
+
+[Service]
+Type=simple
+User=homophone-replacer
+Group=homophone-replacer
+WorkingDirectory=/opt/homophone-replacer
+ExecStart=/opt/homophone-replacer/bin/homophone-replacer-server --config config/service.json
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+ReadWritePaths=/opt/homophone-replacer/logs
+
+[Install]
+WantedBy=multi-user.target

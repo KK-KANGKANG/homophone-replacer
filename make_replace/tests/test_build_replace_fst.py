@@ -57,9 +57,21 @@ class BuildReplaceFstIntegrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "replace.fst"
             build_fst(plan, output)
-            self.assertEqual(rewrite_text(output, "luan3chao2"), "卵巢")
-            self.assertEqual(rewrite_text(output, "luan4chao2"), "卵巢")
-            self.assertEqual(rewrite_text(output, "未知luan4chao2"), "未知卵巢")
+            self.assertEqual(rewrite_text(output, "#luan3##chao2#"), "卵巢")
+            self.assertEqual(rewrite_text(output, "#luan4##chao2#"), "卵巢")
+            self.assertEqual(
+                rewrite_text(output, "未知#luan4##chao2#"), "未知卵巢"
+            )
+
+    def test_flexible_rule_does_not_match_inside_another_syllable(self):
+        from make_replace.build_replace_fst import build_fst, rewrite_text
+
+        plan = plan_rules([MappingRule("hou2", "喉", 1)])
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "replace.fst"
+            build_fst(plan, output)
+            self.assertEqual(rewrite_text(output, "#zhou1#"), "#zhou1#")
+            self.assertEqual(rewrite_text(output, "#hou1#"), "喉")
 
     def test_toneless_conflict_has_no_flexible_rewrite(self):
         from make_replace.build_replace_fst import build_fst, rewrite_text
@@ -74,6 +86,13 @@ class BuildReplaceFstIntegrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "replace.fst"
             build_fst(plan, output)
-            self.assertEqual(rewrite_text(output, "fei4jing4mai4"), "肺静脉")
-            self.assertEqual(rewrite_text(output, "fei2jing4mai4"), "腓静脉")
-            self.assertEqual(rewrite_text(output, "fei3jing4mai4"), "fei3jing4mai4")
+            self.assertEqual(
+                rewrite_text(output, "#fei4##jing4##mai4#"), "肺静脉"
+            )
+            self.assertEqual(
+                rewrite_text(output, "#fei2##jing4##mai4#"), "腓静脉"
+            )
+            self.assertEqual(
+                rewrite_text(output, "#fei3##jing4##mai4#"),
+                "#fei3##jing4##mai4#",
+            )

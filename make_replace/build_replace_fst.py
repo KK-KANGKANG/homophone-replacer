@@ -29,6 +29,16 @@ def conflict_bases(conflict: TonelessConflict) -> tuple[str, ...]:
     return tuple(syllable.base for syllable in conflict.syllables)
 
 
+def _encode_syllables(syllables: Any, pynini: Any) -> Any:
+    """Encode complete syllables with sentinels at both sides."""
+    parts = [pynini.accep("#" + syllable.base + syllable.tone + "#")
+             for syllable in syllables]
+    result = parts[0]
+    for part in parts[1:]:
+        result += part
+    return result.optimize()
+
+
 def _length_penalty(max_syllables: int, syllables: int) -> float:
     return float(max_syllables - syllables)
 
@@ -47,7 +57,8 @@ def _load_pynini() -> tuple[Any, Any, Any, Any, Any]:
 
 def _tone_flexible_acceptor(syllables: Any, pynini: Any) -> Any:
     tone = pynini.union("1", "2", "3", "4").optimize()
-    parts = [pynini.accep(syllable.base) + tone for syllable in syllables]
+    parts = [pynini.accep("#" + syllable.base) + tone + pynini.accep("#")
+             for syllable in syllables]
     result = parts[0]
     for part in parts[1:]:
         result += part
@@ -61,7 +72,7 @@ def _flexible_acceptor(rule: FlexibleRule, pynini: Any) -> Any:
 def build_fst(
     plan: RulePlan, output: Path, exact_only: bool = False
 ) -> BuildStats:
-    pynini, cdrewrite, pynutil, _, utf8 = _load_pynini()
+    pynini, _, pynutil, _, utf8 = _load_pynini()
     if not plan.exact_rules:
         raise ValueError("mapping contains no valid rules")
     max_syllables = max(
@@ -71,7 +82,10 @@ def build_fst(
     flexible_base = blocker_base * 2
     rules = [
         pynutil.add_weight(
-            pynini.cross(rule.pinyin, rule.target),
+            pynini.cross(
+                _encode_syllables(parse_toned_pinyin(rule.pinyin), pynini),
+                rule.target,
+            ),
             _length_penalty(
                 max_syllables, len(parse_toned_pinyin(rule.pinyin))
             ),
@@ -96,7 +110,10 @@ def build_fst(
             for conflict in plan.toneless_conflicts
         )
     rule_union = pynini.union(*rules).optimize()
-    compiled = cdrewrite(rule_union, "", "", utf8.VALID_UTF8_CHAR.star).optimize()
+    # 直接构建“规则路径 + 原文回退路径”，避免 cdrewrite 为任意上下文展开
+    # 大量中间状态。回退路径权重高于规则路径，确保命中规则时优先替换。
+    fallback = pynutil.add_weight(utf8.VALID_UTF8_CHAR, 1000.0)
+    compiled = pynini.union(rule_union, fallback).closure().optimize()
     compiled.write(str(output))
     return BuildStats(
         len(plan.exact_rules),

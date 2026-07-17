@@ -16,6 +16,11 @@ __pycache__/
 *.py[cod]
 /.venv/
 /.fst-build/
+/logs/
+/data/hr-files/*.before-*
+/data/hr-files/ova2-mapping-candidates.txt
+/data/hr-files/ova2-mapping-report.txt
+/dist/
 
 # macOS metadata
 .DS_Store

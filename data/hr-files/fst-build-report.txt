@@ -1,37 +1,19 @@
-构建日期: 2026-07-15
-构建方式: 本地 Docker Linux x86_64
-Docker 镜像: homophone-pynini:2.1.7
-Docker 内存: 24.9 GB
-Docker swap: 2 GB
-
-精确规则: 1957
-宽松规则: 1943
+精确规则: 5155
+宽松规则: 5137
 带调冲突丢弃: 0
-纯拼音冲突: 7
-FST 字节数: 59252050
-构建秒数: 217.034
-SHA-256: abf551759025ae18bb61b1395129cdbedf94acde327506484a99160dd6c8b046
+纯拼音冲突: 9
+FST 字节数: 2857578
+构建秒数: 3.242
+
+带调冲突明细:
 
 纯拼音冲突明细:
 banyueban=半月板 / 半月瓣
+bujiazonghezheng=布加综合征 / 布加综合症
 feijingmai=肺静脉 / 腓静脉
+ganzaozonghezheng=干燥综合征 / 干燥综合症
 jinduan=近段 / 近端
 shenjingmai=深静脉 / 肾静脉
 xiabu=下部 / 峡部
 yanbu=咽部 / 眼部
 yuanduan=远段 / 远端
-
-功能验证:
-左侧乱潮 → 左侧卵巢
-左侧卵巢 → 左侧卵巢
-肺静脉和腓静脉 → 肺静脉和腓静脉
-匪静脉 → 匪静脉
-
-性能验证（3400 字，5 次平均）:
-旧 FST: 初始化 17.4 ms，处理 5.0 ms
-精确 FST: 初始化 127.2 ms，处理 40.4 ms
-目标 FST: 初始化 174.2 ms，处理 94.7 ms
-
-说明:
-旧 FST 实际仅包含约 12 条不同规则。当前目标 FST 包含完整超声规则，
-生产程序应长期复用 HomophoneReplacer 实例，避免每次请求重复加载 FST。

@@ -7,6 +7,7 @@
 - 独立的C++项目，无需完整的sherpa-onnx环境
 - 支持Windows和Linux平台编译
 - 基于 lexicon.txt (最大匹配分词) + kaldifst FST 规则（replace.fst）的同音词组替换
+- FST 内部为每个拼音音节增加边界标记，避免无调规则从其他音节内部误命中
 - 最小化依赖，快速编译和部署
 
 ## 项目结构
@@ -113,6 +114,30 @@ export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
 2. **拼音转换**: 词语转为拼音序列（来自 `lexicon.txt`，单字回退）
 3. **FST 规则重写**: 使用 `replace.fst` 在拼音序列上进行短语级匹配与替换
 4. **结果重构**: 根据 FST 输出的词序列重组为文本
+
+## HTTP 服务
+
+项目提供常驻服务程序 `homophone-replacer-server`，启动时加载一次 FST，适合持续接收 ASR 请求。
+
+```bash
+./scripts/run-server.sh
+curl http://127.0.0.1:18080/health
+curl -X POST http://127.0.0.1:18080/replace \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"左侧乱潮"}'
+```
+
+Windows 可执行 `scripts\run-server.bat`。完整配置、systemd、Windows Service 和排错说明见 [HTTP 服务部署](docs/service-deployment.md)。
+
+Linux 发布脚本会根据构建环境自动生成 x64 或 ARM64 安装包。
+
+构建相关脚本用途：
+
+```text
+build.sh / build.bat             构建命令行程序和 HTTP 服务
+scripts/build_fst_docker.sh      构建长期 replace.fst
+scripts/run-server.sh / .bat     前台运行 HTTP 服务
+```
 
 ## 自定义扩展
 

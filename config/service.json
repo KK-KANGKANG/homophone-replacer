@@ -1,0 +1,21 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 18080,
+    "worker_count": 2,
+    "queue_capacity": 100,
+    "max_text_characters": 10000
+  },
+  "rules": {
+    "lexicon": "data/hr-files/lexicon.txt",
+    "fst": "data/hr-files/replace.fst",
+    "mapping_enabled": false,
+    "mapping": "data/hr-files/mapping.txt"
+  },
+  "logging": {
+    "level": "info",
+    "directory": "logs",
+    "max_file_mb": 50,
+    "max_files": 10
+  }
+}

@@ -7,6 +7,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/.fst-build}"
 IMAGE="${PYNINI_IMAGE:-homophone-pynini:2.1.7}"
 MODE="tone-aware"
 INSTALL=false
+EXTRA_ARGS=()
 
 for arg in "$@"; do
   case "${arg}" in
@@ -60,7 +61,7 @@ docker run --rm --platform linux/amd64 \
     --mapping data/hr-files/mapping.txt \
     --fst-output "/output/${FST_NAME}" \
     --report-output "/output/${REPORT_NAME}" \
-    "${EXTRA_ARGS[@]}"
+    ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 
 echo "Generated: ${OUTPUT_DIR}/${FST_NAME}"
 echo "Report: ${OUTPUT_DIR}/${REPORT_NAME}"
