@@ -16,6 +16,7 @@
 homophone-replacer-standalone/
 ├── src/                    # 源代码
 │   ├── homophone-replacer.h/cc  # 核心同音字替换类
+│   ├── server/                 # HTTP 服务实现
 │   ├── main.cc                 # 主程序入口
 │   └── utils/                  # 工具函数
 ├── data/hr-files/              # 数据文件
@@ -24,6 +25,12 @@ homophone-replacer-standalone/
 │   ├── replace.fst             # 正式替换规则（FST）
 │   └── fst-build-report.txt    # 正式 FST 构建报告
 ├── make_replace/               # mapping 与 FST 生成工具
+│   └── tests/                  # 生成工具测试
+├── tools/                      # 词表分析和构建实验工具
+├── build/                      # 本地和 Linux 构建产物（已忽略）
+│   ├── local/
+│   ├── linux-arm64/
+│   └── linux-arm64-jammy/
 ├── scripts/
 │   └── build_fst_docker.sh     # 本地 Docker FST 构建脚本
 ├── Dockerfile.pynini           # Pynini 构建环境
@@ -68,36 +75,36 @@ chmod +x build.sh
 # GENERATOR="Ninja" ./build.sh
 
 # 指定构建目录
-# BUILD_DIR=out ./build.sh
+# BUILD_DIR=build/custom ./build.sh
 
 # 运行（如遇共享库找不到，先设置环境变量）
-export LD_LIBRARY_PATH="./build/lib:$LD_LIBRARY_PATH"
-./build/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
+export LD_LIBRARY_PATH="./build/local/lib:$LD_LIBRARY_PATH"
+./build/local/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
 ```
 
 ### 3. 使用
 
 ```bash
 # 基本使用
-./build/bin/homophone-replacer-standalone --text "左侧乱潮"
+./build/local/bin/homophone-replacer-standalone --text "左侧乱潮"
 
 # 启用调试信息
-./build/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
+./build/local/bin/homophone-replacer-standalone --text "左侧乱潮" --debug
 
 # 查看帮助
-./build/bin/homophone-replacer-standalone --help
+./build/local/bin/homophone-replacer-standalone --help
 
 # 运行时增删关键词（不会修改 replace.fst，只在本次进程内生效）
 # 添加（可重复多次）： --add-rule 拼音=汉字
-./build/bin/homophone-replacer-standalone --text "他是排长" \
+./build/local/bin/homophone-replacer-standalone --text "他是排长" \
   --add-rule "pai2zhang3=排长" --debug
 
 # 删除（可重复多次）： --del-rule 拼音
-./build/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
+./build/local/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
   --rules-file ./data/hr-files/mapping.txt --del-rule qi4ju4 --debug
 
 # 批量： --rules-file 文件（每行：拼音=汉字）
-./build/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
+./build/local/bin/homophone-replacer-standalone --text "器具损坏影响排长" \
   --rules-file ./data/hr-files/mapping.txt --debug
 ```
 
@@ -217,7 +224,7 @@ FST 候选文件生成在：
 
 ### FST 性能
 
-当前目标 FST 包含 1,957 条精确规则、1,943 条无调规则和 7 组冲突保护。实测首次加载约 174ms；3,400 字长文本处理 5 次平均约 94.7ms。普通 20～50 字 ASR 单句通常为毫秒级，单个词汇通常低于 1ms。
+当前目标 FST 包含 5,155 条精确规则、5,137 条无调规则和 9 组冲突保护。FST 构建使用“规则路径 + 原文回退路径”，避免大规模展开通用重写上下文，适合较大词表。
 
 `HomophoneReplacer` 应在程序启动时创建并长期复用。不要为每次识别请求重新初始化，否则会重复支付 FST 加载时间。
 

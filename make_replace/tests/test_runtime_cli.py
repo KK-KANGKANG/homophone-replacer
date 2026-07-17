@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXE = ROOT / "build/bin/homophone-replacer-standalone"
+EXE = ROOT / "build/local/bin/homophone-replacer-standalone"
 
 
 def native_executable_exists() -> bool:

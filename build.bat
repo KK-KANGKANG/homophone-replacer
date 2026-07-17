@@ -15,12 +15,12 @@ if "%VCINSTALLDIR%"=="" (
 )
 
 rem 创建构建目录
-if not exist build mkdir build
-cd build
+if not exist build\local mkdir build\local
+cd build\local
 
 rem 运行CMake配置
 echo Running CMake configuration...
-cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release
+cmake ../.. -A x64 -DCMAKE_BUILD_TYPE=Release
 if %errorlevel% neq 0 (
     echo CMake configuration failed!
     echo CMake配置失败！
@@ -43,12 +43,12 @@ echo ====================================================
 echo Build completed successfully!
 echo 编译成功完成！
 echo.
-echo Executable location: build\bin\Release\homophone-replacer-standalone.exe
-echo 可执行文件位置: build\bin\Release\homophone-replacer-standalone.exe
+echo Executable location: build\local\bin\Release\homophone-replacer-standalone.exe
+echo 可执行文件位置: build\local\bin\Release\homophone-replacer-standalone.exe
 echo.
 echo Usage example:
 echo 使用示例:
-echo   cd build\bin\Release
+echo   cd build\local\bin\Release
 echo   homophone-replacer-standalone.exe --text "他想知道这个问题的答案"
 echo ====================================================
 

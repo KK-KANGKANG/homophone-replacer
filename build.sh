@@ -8,7 +8,7 @@ set -euo pipefail
 #   BUILD_DIR=out ./build.sh  # Custom build dir
 
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
-BUILD_DIR=${BUILD_DIR:-"$ROOT_DIR/build"}
+BUILD_DIR=${BUILD_DIR:-"$ROOT_DIR/build/local"}
 CONFIG=${CONFIG:-Release}
 GENERATOR=${GENERATOR:-}
 
@@ -33,9 +33,8 @@ echo "Build finished. Binaries:"
 echo "  $BUILD_DIR/bin/homophone-replacer-standalone"
 echo
 echo "Run example (from project root):"
-echo "  ./build/bin/homophone-replacer-standalone --text '他想知道玄界芯片问题的答案' --debug"
+echo "  ./build/local/bin/homophone-replacer-standalone --text '他想知道玄界芯片问题的答案' --debug"
 echo
 echo "If shared libraries are not found, set runtime path first:"
 echo "  export LD_LIBRARY_PATH=\"$BUILD_DIR/lib:$LD_LIBRARY_PATH\""
 echo
-
